@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::net::{Ipv4Addr, UdpSocket};
+use std::time::Duration;
 
 pub struct BattlEyeRconService {
     ip: String,
@@ -10,9 +11,9 @@ pub struct BattlEyeRconService {
 }
 
 impl BattlEyeRconService {
-    const HEADER_SIZE: usize = 10000; // Is this enough? Time will tell.
+    const HEADER_SIZE: usize = 10000; // Is this enough?
 
-    pub fn new(ip: String, udp_port: i32, password: String) -> Self {
+    pub fn new(ip: String, udp_port: i32, password: String) -> BattlEyeRconService {
         Self {
             ip,
             udp_port,
@@ -30,7 +31,12 @@ impl BattlEyeRconService {
             .as_ref()
             .unwrap()
             .connect(self.ip.to_string() + ":" + &self.udp_port.to_string())
-            .expect("Cannot connect to server.")
+            .expect("Cannot connect to server.");
+        self.udp_socket
+            .as_ref()
+            .unwrap()
+            .set_read_timeout(Some(Duration::new(45, 0)))
+            .expect("set_read_timeout call failed");
     }
 
     pub fn authenticate(&mut self) {
@@ -68,6 +74,7 @@ impl BattlEyeRconService {
     pub fn listen(&mut self) -> Vec<u8> {
         let socket = self.get_udp_socket();
         let mut buffer = [0; Self::HEADER_SIZE];
+
         socket.recv(&mut buffer).unwrap();
 
         let mut buffer_vec = buffer.to_vec();
@@ -85,7 +92,7 @@ impl BattlEyeRconService {
             return buffer_vec[6..buffer_vec.len()].to_vec();
         }
 
-        // Cannot trust given response data from the server
+        // Cannot trust the given response data from remote
         vec![0x00, 0x00, 0x00]
     }
 
@@ -144,5 +151,35 @@ impl BattlEyeRconService {
         self.sequence_byte
     }
 
-    // pub fn dispatch_data(buf: Vec<usize>) {}
+    pub fn send_command(&self, command: &str) {
+        let mut message: Vec<u8> = vec![0xFF, 0x01, self.get_sequence()]; // 1-byte sequence number
+        message.append(command.as_bytes().to_vec().by_ref()); // Server message (ASCII string without null-terminator)
+
+        let mut crc32check = crc32fast::hash(&message.clone()).to_be_bytes().to_vec();
+        crc32check.reverse(); // Reverse CRC-32
+
+        let mut header_payload = [0x42, 0x45].to_vec(); // Start header BE
+        header_payload.append(crc32check.by_ref()); // CRC 32 hash
+        header_payload.append(&mut message); // Regular bytes array in correct sequence.
+
+        self.get_udp_socket().send(&header_payload).unwrap();
+    }
+
+    fn send_command_as_bytes(&self, mut command: Vec<u8>) {
+        let mut message: Vec<u8> = vec![0xFF, 0x01, self.get_sequence()]; // 1-byte sequence number
+        message.append(&mut command); // Server message (ASCII string without null-terminator)
+
+        let mut crc32check = crc32fast::hash(&message.clone()).to_be_bytes().to_vec();
+        crc32check.reverse(); // Reverse CRC-32
+
+        let mut header_payload = [0x42, 0x45].to_vec(); // Start header BE
+        header_payload.append(crc32check.by_ref()); // CRC 32 hash
+        header_payload.append(&mut message); // Regular bytes array in correct sequence.
+
+        self.get_udp_socket().send(&header_payload).unwrap();
+    }
+
+    pub fn keep_alive(&self) {
+        self.send_command_as_bytes(vec![0x00, 0x00]);
+    }
 }
