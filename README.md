@@ -14,6 +14,7 @@ implement/use this library.
 - [x] Acknowledge logic after receiving a packet from the server
 - [x] CRC-32 validation on every received packet
 - [ ] Keep alive of connection (Within 45 seconds send an empty 2-byte command packet)
+- [ ] Non-blocking read & write to socket
 
 ## Cargo dependencies
 
