@@ -4,7 +4,7 @@ use std::time::Duration;
 
 pub struct BattlEyeRconService {
     ip: String,
-    udp_port: i32,
+    udp_port: u16,
     password: String,
     udp_socket: Option<UdpSocket>,
     sequence_byte: u8,
@@ -12,8 +12,14 @@ pub struct BattlEyeRconService {
 
 impl BattlEyeRconService {
     const HEADER_SIZE: usize = 10000; // Is this enough?
+    const STATIC_HEADER: [u8; 2] = [0x42, 0x45]; // Required identifier
 
-    pub fn new(ip: String, udp_port: i32, password: String) -> BattlEyeRconService {
+    // Constants of packet types for command purpose
+    const MESSAGE_TYPE_PACKET_LOGIN: u8 = 0x00;
+    const MESSAGE_TYPE_PACKET_COMMAND: u8 = 0x01;
+    const MESSAGE_TYPE_PACKET_SERVER_MESSAGE: u8 = 0x02; // Also required for acknowledging packets from remote
+
+    pub fn new(ip: String, udp_port: u16, password: String) -> BattlEyeRconService {
         Self {
             ip,
             udp_port,
@@ -40,42 +46,16 @@ impl BattlEyeRconService {
     }
 
     pub fn authenticate(&mut self) {
-        let mut crc32prepare: Vec<u8> = vec![0xFF, 0x00];
-        crc32prepare.append(&mut self.password.as_bytes().to_vec());
-
-        let mut crc32checked = crc32fast::hash(&crc32prepare).to_be_bytes().to_vec();
-        crc32checked.reverse(); // Reverse CRC-32
-
-        let mut message: Vec<u8> = vec![];
-        message.append(&mut [0x42, 0x45].to_vec()); // Start header BE
-        message.append(crc32checked.by_ref()); // CRC 32 hash
-
-        message.push(0xFF);
-        message.push(0x00); // Login action
-
-        // Payload
-        message.append(&mut self.password.as_bytes().to_vec());
-
-        let socket = self.get_udp_socket();
-        socket.send(&message).unwrap();
-
-        let response = self.listen();
-        // println!("{:#04X?}", response);
-
-        if response[2] == 0x01 {
-            println!("Authentication accepted.");
-        } else if response[2] == 0x00 {
-            println!("Password does not match with BattlEye config file");
-        } else {
-            println!("Authentication failed");
-        }
+        self.send_to_socket(
+            Self::MESSAGE_TYPE_PACKET_LOGIN,
+            self.password.as_bytes().to_vec(),
+        )
     }
 
     pub fn listen(&mut self) -> Vec<u8> {
-        let socket = self.get_udp_socket();
         let mut buffer = [0; Self::HEADER_SIZE];
 
-        socket.recv(&mut buffer).unwrap();
+        self.get_udp_socket().recv(&mut buffer).unwrap();
 
         let mut buffer_vec = buffer.to_vec();
 
@@ -101,24 +81,28 @@ impl BattlEyeRconService {
     }
 
     fn acknowledge_msg(&mut self, sequence: u8) {
-        let mut crc32prepare: Vec<u8> = vec![0xFF, 0x02];
-        crc32prepare.push(sequence);
-
-        let mut crc32checked = crc32fast::hash(&crc32prepare).to_be_bytes().to_vec();
-        crc32checked.reverse(); // Reverse CRC-32
-
-        let mut message: Vec<u8> = vec![];
-        message.append(&mut [0x42, 0x45].to_vec()); // Start header BE
-        message.append(crc32checked.by_ref());
-
-        message.push(0xFF);
-        message.push(0x02); // Server message
-
-        message.push(sequence);
-
-        let socket = self.get_udp_socket();
-        socket.send(&message).unwrap();
+        self.send_to_socket(
+            Self::MESSAGE_TYPE_PACKET_SERVER_MESSAGE,
+            [sequence].to_vec(),
+        );
         self.set_sequence(sequence);
+    }
+
+    fn send_to_socket(&mut self, message_type_packet: u8, mut msg: Vec<u8>) {
+        let mut assemble_packets: Vec<u8> = vec![0xFF, message_type_packet];
+        assemble_packets.append(msg.by_ref());
+
+        // Create CRC 32 hash from msg packet array
+        let mut crc32check = crc32fast::hash(&assemble_packets.clone())
+            .to_be_bytes()
+            .to_vec();
+        crc32check.reverse(); // Reverse CRC-32
+
+        let mut data = Self::STATIC_HEADER.to_vec(); // Start header BE
+        data.append(crc32check.by_ref()); // CRC 32 hash
+        data.append(&mut assemble_packets); // Regular packet array without CRC 32
+
+        self.get_udp_socket().send(&data).unwrap();
     }
 
     fn is_valid_msg(message: &Vec<u8>) -> bool {
@@ -135,11 +119,11 @@ impl BattlEyeRconService {
             }
         }
 
-        println!("Message incorrect");
+        println!("Unexpected or invalid message received");
         false
     }
 
-    pub fn get_udp_port(&self) -> i32 {
+    pub fn get_udp_port(&self) -> u16 {
         self.udp_port
     }
 
@@ -151,35 +135,13 @@ impl BattlEyeRconService {
         self.sequence_byte
     }
 
-    pub fn send_command(&self, command: &str) {
-        let mut message: Vec<u8> = vec![0xFF, 0x01, self.get_sequence()]; // 1-byte sequence number
-        message.append(command.as_bytes().to_vec().by_ref()); // Server message (ASCII string without null-terminator)
-
-        let mut crc32check = crc32fast::hash(&message.clone()).to_be_bytes().to_vec();
-        crc32check.reverse(); // Reverse CRC-32
-
-        let mut header_payload = [0x42, 0x45].to_vec(); // Start header BE
-        header_payload.append(crc32check.by_ref()); // CRC 32 hash
-        header_payload.append(&mut message); // Regular bytes array in correct sequence.
-
-        self.get_udp_socket().send(&header_payload).unwrap();
+    pub fn send_command(&mut self, command: &str) {
+        let mut command_body: Vec<u8> = vec![self.get_sequence()];
+        command_body.append(&mut command.as_bytes().to_vec());
+        self.send_to_socket(Self::MESSAGE_TYPE_PACKET_COMMAND, command_body);
     }
 
-    fn send_command_as_bytes(&self, mut command: Vec<u8>) {
-        let mut message: Vec<u8> = vec![0xFF, 0x01, self.get_sequence()]; // 1-byte sequence number
-        message.append(&mut command); // Server message (ASCII string without null-terminator)
-
-        let mut crc32check = crc32fast::hash(&message.clone()).to_be_bytes().to_vec();
-        crc32check.reverse(); // Reverse CRC-32
-
-        let mut header_payload = [0x42, 0x45].to_vec(); // Start header BE
-        header_payload.append(crc32check.by_ref()); // CRC 32 hash
-        header_payload.append(&mut message); // Regular bytes array in correct sequence.
-
-        self.get_udp_socket().send(&header_payload).unwrap();
-    }
-
-    pub fn keep_alive(&self) {
-        self.send_command_as_bytes(vec![0x00, 0x00]);
+    pub fn keep_alive(&mut self) {
+        self.send_to_socket(Self::MESSAGE_TYPE_PACKET_COMMAND, [0x00].to_vec());
     }
 }
