@@ -6,7 +6,7 @@ use battleye_rust::battleye_rcon::rcon_socket_connection::BattlEyeRconService;
 
 fn main() {
     let mut battl_eye_rcon_service: BattlEyeRconService =
-        BattlEyeRconService::new("127.0.0.1".to_string(), 2306, String::from("betesting123"));
+        BattlEyeRconService::new("127.0.0.1".to_string(), 2306, String::from("password"));
     battl_eye_rcon_service.prepare_socket();
     battl_eye_rcon_service.authenticate();
 
