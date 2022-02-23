@@ -1,5 +1,5 @@
 pub mod battleye_rcon {
-    pub mod rcon_socket_connection;
+    pub mod battle_eye_rcon_service;
 
     #[test]
     fn it_works() {}
