@@ -6,6 +6,13 @@ It is a modest BattlEye RCON library made in rust. This support developers to pe
 acknowledging packets and sending commands via UDP socket connection. There is an example how you can 
 implement/use this library.
 
+[![MIT licensed][mit-badge]][mit-url]
+
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
+[mit-url]: https://github.com/steffalon/battleye-rust/blob/main/LICENSE
+
+---
+
 # Features
 
 - [x] Authentication
@@ -15,6 +22,8 @@ implement/use this library.
 - [x] CRC-32 validation on every received packet
 - [x] Keep alive connection method included
 - [x] Non-blocking read & write to socket (See examples)
+- [ ] Error handling
+- [ ] Build self-testing
 
 ## Cargo dependencies
 
