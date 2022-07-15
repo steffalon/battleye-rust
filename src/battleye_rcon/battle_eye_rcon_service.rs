@@ -1,4 +1,4 @@
-use std::io::{ErrorKind, Write};
+use std::io::{ErrorKind, Write, Error as ioError};
 use std::net::{Ipv4Addr, UdpSocket};
 
 pub struct BattlEyeRconService {
@@ -10,7 +10,8 @@ pub struct BattlEyeRconService {
 }
 
 impl BattlEyeRconService {
-    const HEADER_SIZE: usize = 10000; // Is this enough?
+    const HEADER_SIZE: usize = 10000;
+    // Is this enough?
     const STATIC_HEADER: [u8; 2] = [0x42, 0x45]; // Required identifier
 
     // Constants of packet types for command purpose
@@ -28,20 +29,13 @@ impl BattlEyeRconService {
         }
     }
 
-    pub fn prepare_socket(&mut self) {
-        self.udp_socket = Option::from(
-            UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).expect("Unable to bind this address"),
-        );
-        self.udp_socket
-            .as_ref()
-            .unwrap()
-            .connect(self.ip.to_string() + ":" + &self.udp_port.to_string())
-            .expect("Cannot connect to server.");
-        self.udp_socket
-            .as_ref()
-            .unwrap()
-            .set_nonblocking(true)
-            .expect("set_read_timeout call failed");
+    pub fn prepare_socket(&mut self) -> Result<(), ioError> {
+        let udp_socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0))?;
+        udp_socket.connect(self.ip.to_string() + ":" + &self.udp_port.to_string())?;
+        udp_socket.set_nonblocking(true)?;
+
+        self.udp_socket = Option::from(udp_socket);
+        Ok(())
     }
 
     pub fn authenticate(&mut self) {
@@ -51,7 +45,7 @@ impl BattlEyeRconService {
         )
     }
 
-    pub fn listen(&mut self) -> Vec<u8> {
+    pub fn listen(&mut self) -> Result<Vec<u8>, ioError> {
         let mut buffer = [0; Self::HEADER_SIZE];
 
         match self.get_udp_socket().recv(&mut buffer) {
@@ -68,18 +62,16 @@ impl BattlEyeRconService {
                 // Check if CRC-32 server response is valid
                 if Self::is_valid_msg(&buffer_vec) {
                     self.acknowledge_msg(buffer_vec[8]);
-                    return buffer_vec[6..buffer_vec.len()].to_vec();
+                    return Ok(buffer_vec[6..buffer_vec.len()].to_vec());
                 }
 
-                vec![]
+                Ok(vec![])
             }
-            Err(ref err) if err.kind() != ErrorKind::WouldBlock => {
-                println!("Something went wrong: {}", err);
-                vec![]
+            Err(err) if err.kind() != ErrorKind::WouldBlock => {
+                Err(err)
             }
-            // Do nothing otherwise.
             _ => {
-                vec![]
+                Ok(vec![])
             }
         }
     }
@@ -126,8 +118,6 @@ impl BattlEyeRconService {
                 return true;
             }
         }
-
-        println!("Unexpected or invalid message received");
         false
     }
 
