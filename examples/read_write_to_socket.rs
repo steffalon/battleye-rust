@@ -8,6 +8,7 @@ extern crate crc32fast;
 
 use battleye_rust::battleye_rcon::battle_eye_rcon_service::BattlEyeRconService;
 
+#[allow(unused_must_use)]
 fn main() {
     let ip = "127.0.0.1".to_string();
     let port = 2306;
@@ -16,8 +17,11 @@ fn main() {
     let battl_eye_rcon_service: Arc<Mutex<BattlEyeRconService>> =
         Arc::new(Mutex::new(BattlEyeRconService::new(ip, port, password)));
 
-    battl_eye_rcon_service.lock().unwrap().prepare_socket();
-    battl_eye_rcon_service.lock().unwrap().authenticate();
+    {
+        let mut lock = battl_eye_rcon_service.lock().unwrap();
+        lock.prepare_socket().expect("Initiating socket failed");
+        lock.authenticate();
+    }
 
     let socket_commands = battl_eye_rcon_service.clone();
     let socket_keep_alive = battl_eye_rcon_service.clone();
@@ -27,7 +31,7 @@ fn main() {
         socket_keep_alive.lock().unwrap().keep_alive();
     });
 
-    // A thread for terminal input
+    // Thread for terminal input
     thread::spawn(move || loop {
         let mut input_string = String::new();
         stdin()
@@ -39,9 +43,13 @@ fn main() {
             .send_command(input_string.as_str());
     });
 
-    let listen_socket_thread = thread::spawn(move || loop {
+    thread::spawn(move || loop {
         sleep(Duration::from_millis(50)); // Reduce CPU workload
-        let response = battl_eye_rcon_service.lock().unwrap().listen();
+        let response = battl_eye_rcon_service
+            .lock()
+            .unwrap()
+            .listen()
+            .expect("Failed to receive socket data");
 
         if response.is_empty() {
             continue;
@@ -54,7 +62,7 @@ fn main() {
                 if response[2] == 0x01 {
                     println!("Authentication accepted.");
                 } else {
-                    println!("Password does not match with BattlEye config file");
+                    println!("Password does not match with BattlEye config file.");
                 }
             }
             0x01 => {
@@ -77,7 +85,5 @@ fn main() {
                 println!("Unknown packet identifier.")
             }
         }
-    });
-
-    listen_socket_thread.join().unwrap();
+    }).join();
 }
