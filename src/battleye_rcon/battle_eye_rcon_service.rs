@@ -66,7 +66,7 @@ impl BattlEyeRconService {
                     return Ok(buffer_vec[6..buffer_vec.len()].to_vec());
                 }
 
-                Ok(vec![])
+                Err(Error::new(ErrorKind::InvalidData, "Invalid checksum"))
             }
             Err(err) if err.kind() != ErrorKind::WouldBlock => {
                 Err(err)
