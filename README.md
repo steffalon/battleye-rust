@@ -22,7 +22,7 @@ implement/use this library.
 - [x] CRC-32 validation on every received packet
 - [x] Keep alive connection method included
 - [x] Non-blocking read & write to socket (See examples)
-- [ ] Error handling
+- [x] Error handling
 - [ ] Build self-testing
 
 ## Cargo dependencies
