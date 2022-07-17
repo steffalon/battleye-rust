@@ -40,7 +40,7 @@ fn main() {
         socket_commands
             .lock()
             .unwrap()
-            .send_command(input_string.as_str());
+            .send_command(input_string.as_str().trim());
     });
 
     thread::spawn(move || loop {

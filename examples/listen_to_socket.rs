@@ -22,7 +22,7 @@ fn main() {
     let keep_alive_socket = battl_eye_rcon_service.clone();
 
     thread::spawn(move || loop {
-        sleep(Duration::from_secs(35)); // BE recommends sending a keep alive before 45 seconds.
+        sleep(Duration::from_secs(35)); // BE recommends sending a keep alive packet before 45 seconds.
         keep_alive_socket.lock().unwrap().keep_alive();
     });
 
