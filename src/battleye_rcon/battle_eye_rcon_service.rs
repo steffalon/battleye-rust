@@ -1,4 +1,4 @@
-use std::io::{ErrorKind, Write, Error as ioError};
+use std::io::{ErrorKind, Write, Error};
 use std::net::{Ipv4Addr, UdpSocket};
 
 pub struct BattlEyeRconService {
@@ -6,7 +6,6 @@ pub struct BattlEyeRconService {
     udp_port: u16,
     password: String,
     udp_socket: Option<UdpSocket>,
-    sequence_byte: u8,
 }
 
 impl BattlEyeRconService {
@@ -25,11 +24,10 @@ impl BattlEyeRconService {
             udp_port,
             password,
             udp_socket: None,
-            sequence_byte: 0x00,
         }
     }
 
-    pub fn prepare_socket(&mut self) -> Result<(), ioError> {
+    pub fn prepare_socket(&mut self) -> Result<(), Error> {
         let udp_socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0))?;
         udp_socket.connect(self.ip.to_string() + ":" + &self.udp_port.to_string())?;
         udp_socket.set_nonblocking(true)?;
@@ -38,14 +36,14 @@ impl BattlEyeRconService {
         Ok(())
     }
 
-    pub fn authenticate(&mut self) {
+    pub fn authenticate(&mut self) -> std::io::Result<usize> {
         self.send_to_socket(
             Self::MESSAGE_TYPE_PACKET_LOGIN,
             self.password.as_bytes().to_vec(),
         )
     }
 
-    pub fn listen(&mut self) -> Result<Vec<u8>, ioError> {
+    pub fn listen(&mut self) -> Result<Vec<u8>, Error> {
         let mut buffer = [0; Self::HEADER_SIZE];
 
         match self.get_udp_socket().recv(&mut buffer) {
@@ -61,7 +59,10 @@ impl BattlEyeRconService {
 
                 // Check if CRC-32 server response is valid
                 if Self::is_valid_msg(&buffer_vec) {
-                    self.acknowledge_msg(buffer_vec[8]);
+                    let ack = self.acknowledge_msg(buffer_vec[8]);
+                    if ack.is_err() {
+                        return Err(ack.err().unwrap())
+                    }
                     return Ok(buffer_vec[6..buffer_vec.len()].to_vec());
                 }
 
@@ -76,19 +77,14 @@ impl BattlEyeRconService {
         }
     }
 
-    fn set_sequence(&mut self, sequence: u8) {
-        self.sequence_byte = sequence;
-    }
-
-    fn acknowledge_msg(&mut self, sequence: u8) {
+    fn acknowledge_msg(&mut self, sequence: u8) -> std::io::Result<usize> {
         self.send_to_socket(
             Self::MESSAGE_TYPE_PACKET_SERVER_MESSAGE,
             [sequence].to_vec(),
-        );
-        self.set_sequence(sequence);
+        )
     }
 
-    fn send_to_socket(&mut self, message_type_packet: u8, mut msg: Vec<u8>) {
+    fn send_to_socket(&mut self, message_type_packet: u8, mut msg: Vec<u8>) -> std::io::Result<usize> {
         let mut assemble_packets: Vec<u8> = vec![0xFF, message_type_packet];
         assemble_packets.append(msg.by_ref());
 
@@ -102,7 +98,7 @@ impl BattlEyeRconService {
         data.append(crc32check.by_ref()); // CRC 32 hash
         data.append(&mut assemble_packets); // Regular packet array without CRC 32
 
-        self.get_udp_socket().send(&data).unwrap();
+        self.get_udp_socket().send(&data)
     }
 
     fn is_valid_msg(message: &Vec<u8>) -> bool {
@@ -129,17 +125,13 @@ impl BattlEyeRconService {
         self.udp_socket.as_ref().unwrap()
     }
 
-    fn get_sequence(&self) -> u8 {
-        self.sequence_byte
-    }
-
-    pub fn send_command(&mut self, command: &str) {
-        let mut command_body: Vec<u8> = vec![self.get_sequence()];
+    pub fn send_command(&mut self, command: &str) -> std::io::Result<usize> {
+        let mut command_body: Vec<u8> = vec![0];
         command_body.append(&mut command.as_bytes().to_vec());
-        self.send_to_socket(Self::MESSAGE_TYPE_PACKET_COMMAND, command_body);
+        self.send_to_socket(Self::MESSAGE_TYPE_PACKET_COMMAND, command_body)
     }
 
-    pub fn keep_alive(&mut self) {
-        self.send_to_socket(Self::MESSAGE_TYPE_PACKET_COMMAND, [0x00].to_vec());
+    pub fn keep_alive(&mut self) -> std::io::Result<usize> {
+        self.send_to_socket(Self::MESSAGE_TYPE_PACKET_COMMAND, vec![0x00])
     }
 }
