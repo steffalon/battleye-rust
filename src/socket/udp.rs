@@ -13,7 +13,7 @@ impl SocketAction for UdpSocketConnection {
     }
 
     fn listen(&self, buffer_size: usize) -> Result<Vec<u8>, Error> {
-        let mut buffer_data = Vec::with_capacity(buffer_size);
+        let mut buffer_data = vec![0; buffer_size];
         self.udp_socket.recv(&mut buffer_data)?;
         Ok(buffer_data.to_vec())
     }
