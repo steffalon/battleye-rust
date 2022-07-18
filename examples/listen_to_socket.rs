@@ -1,25 +1,37 @@
+use std::net::{Ipv4Addr, UdpSocket};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
 
-extern crate crc32fast;
-
-use battleye_rust::battleye_rcon::battle_eye_rcon_service::BattlEyeRconService;
+use battleye_rust::remote_console::BERemoteConsole;
+use battleye_rust::socket::udp::UdpSocketConnection;
 
 #[allow(unused_must_use)]
 fn main() {
-    let battl_eye_rcon_service: Arc<Mutex<BattlEyeRconService>> = Arc::new(Mutex::new(
-        BattlEyeRconService::new("127.0.0.1".to_string(), 2306, String::from("password")),
-    ));
+    let ip = "127.0.0.1".to_string();
+    let port = 2306;
+    let password = "password".to_string();
+    let udp_socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).expect("");
+    udp_socket.connect(ip.to_string() + ":" + &port.to_string());
+    udp_socket.set_nonblocking(true);
+
+    let be_remote_console: Arc<Mutex<BERemoteConsole>> =
+        Arc::new(
+            Mutex::new(
+                BERemoteConsole::new(
+                    UdpSocketConnection::new(udp_socket)
+                )
+            )
+        );
 
     {
-        let mut lock = battl_eye_rcon_service.lock().unwrap();
+        let mut lock = be_remote_console.lock().unwrap();
         lock.prepare_socket().expect("Initiating socket failed");
-        lock.authenticate();
+        lock.authenticate(password);
     }
 
-    let keep_alive_socket = battl_eye_rcon_service.clone();
+    let keep_alive_socket = be_remote_console.clone();
 
     thread::spawn(move || loop {
         sleep(Duration::from_secs(35)); // BE recommends sending a keep alive packet before 45 seconds.
@@ -28,7 +40,7 @@ fn main() {
 
     thread::spawn(move || loop {
         sleep(Duration::from_millis(50)); // Reduce CPU workload
-        let response = battl_eye_rcon_service
+        let response = be_remote_console
             .lock()
             .unwrap()
             .listen()
