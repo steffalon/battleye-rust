@@ -1,3 +1,2 @@
-pub mod battleye_rcon {
-    pub mod battle_eye_rcon_service;
-}
+pub mod socket;
+pub mod remote_console;
