@@ -17,14 +17,14 @@ impl BERemoteConsole {
         }
     }
 
-    pub fn authenticate(&mut self, password: String) -> std::io::Result<usize> {
+    pub fn authenticate(&self, password: String) -> std::io::Result<usize> {
         self.send_to_socket(
             packet_types::MESSAGE_TYPE_PACKET_LOGIN,
             password.as_bytes().to_vec(),
         )
     }
 
-    pub fn receive_data(&mut self) -> Result<Vec<u8>, Error> {
+    pub fn receive_data(&self) -> Result<Vec<u8>, Error> {
         match self.get_udp_socket().listen(Self::HEADER_SIZE) {
             Ok(mut response) => {
                 for i in 9..response.len() {
@@ -54,20 +54,20 @@ impl BERemoteConsole {
         }
     }
 
-    fn acknowledge_msg(&mut self, sequence: u8) -> std::io::Result<usize> {
+    fn acknowledge_msg(&self, sequence: u8) -> std::io::Result<usize> {
         self.send_to_socket(
             packet_types::MESSAGE_TYPE_PACKET_SERVER_MESSAGE,
             [sequence].to_vec(),
         )
     }
 
-    pub fn send_command(&mut self, command: &str) -> std::io::Result<usize> {
+    pub fn send_command(&self, command: &str) -> std::io::Result<usize> {
         let mut command_body: Vec<u8> = vec![0];
         command_body.append(&mut command.as_bytes().to_vec());
         self.send_to_socket(packet_types::MESSAGE_TYPE_PACKET_COMMAND, command_body)
     }
 
-    fn send_to_socket(&mut self, message_type_packet: u8, mut msg: Vec<u8>) -> std::io::Result<usize> {
+    fn send_to_socket(&self, message_type_packet: u8, mut msg: Vec<u8>) -> std::io::Result<usize> {
         let mut assemble_packets: Vec<u8> = vec![0xFF, message_type_packet];
         assemble_packets.append(msg.by_ref());
 
@@ -88,7 +88,7 @@ impl BERemoteConsole {
         &self.udp_socket
     }
 
-    pub fn keep_alive(&mut self) -> std::io::Result<usize> {
+    pub fn keep_alive(&self) -> std::io::Result<usize> {
         self.send_to_socket(packet_types::MESSAGE_TYPE_PACKET_COMMAND, vec![0x00])
     }
 }

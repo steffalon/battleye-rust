@@ -1,5 +1,5 @@
 use std::net::{Ipv4Addr, UdpSocket};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
@@ -12,38 +12,30 @@ fn main() {
     let ip = "127.0.0.1".to_string();
     let port = 2306;
     let password = "password".to_string();
-    let udp_socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).expect("");
+    let udp_socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0))
+        .expect("Unable to bind an IP address");
     udp_socket.connect(ip.to_string() + ":" + &port.to_string());
-    udp_socket.set_nonblocking(true);
 
-    let be_remote_console: Arc<Mutex<BERemoteConsole>> =
+    let be_remote_console: Arc<BERemoteConsole> =
         Arc::new(
-            Mutex::new(
-                BERemoteConsole::new(
-                    UdpSocketConnection::new(udp_socket)
-                )
+            BERemoteConsole::new(
+                UdpSocketConnection::new(udp_socket)
             )
         );
 
-    {
-        let mut lock = be_remote_console.lock().unwrap();
-        lock.prepare_socket().expect("Initiating socket failed");
-        lock.authenticate(password);
-    }
+    be_remote_console.authenticate(password);
 
     let keep_alive_socket = be_remote_console.clone();
 
     thread::spawn(move || loop {
         sleep(Duration::from_secs(35)); // BE recommends sending a keep alive packet before 45 seconds.
-        keep_alive_socket.lock().unwrap().keep_alive();
+        keep_alive_socket.keep_alive();
     });
 
     thread::spawn(move || loop {
         sleep(Duration::from_millis(50)); // Reduce CPU workload
         let response = be_remote_console
-            .lock()
-            .unwrap()
-            .listen()
+            .receive_data()
             .expect("Failed to receive socket data");
 
         if response.is_empty() {
