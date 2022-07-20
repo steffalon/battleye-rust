@@ -12,7 +12,7 @@ use battleye_rust::socket::udp::UdpSocketConnection;
 fn main() {
     let ip = "127.0.0.1".to_string();
     let port = 2306;
-    let password = "betesting123".to_string();
+    let password = "password".to_string();
     let udp_socket =
         UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).expect("Unable to bind an IP address");
     udp_socket.connect(ip.to_string() + ":" + &port.to_string());
