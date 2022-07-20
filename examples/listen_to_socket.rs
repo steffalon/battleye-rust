@@ -1,5 +1,5 @@
 use std::net::{Ipv4Addr, UdpSocket};
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
@@ -12,16 +12,12 @@ fn main() {
     let ip = "127.0.0.1".to_string();
     let port = 2306;
     let password = "password".to_string();
-    let udp_socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0))
-        .expect("Unable to bind an IP address");
+    let udp_socket =
+        UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).expect("Unable to bind an IP address");
     udp_socket.connect(ip.to_string() + ":" + &port.to_string());
 
     let be_remote_console: Arc<BERemoteConsole> =
-        Arc::new(
-            BERemoteConsole::new(
-                UdpSocketConnection::new(udp_socket)
-            )
-        );
+        Arc::new(BERemoteConsole::new(UdpSocketConnection::new(udp_socket)));
 
     be_remote_console.authenticate(password);
 
@@ -58,19 +54,18 @@ fn main() {
                         "{}",
                         String::from_utf8(response[3..response.len()].to_owned()).unwrap()
                     );
-                } else {
-                    continue;
                 }
             }
             0x02 => {
                 println!(
                     "{}",
                     String::from_utf8(response[3..response.len()].to_owned()).unwrap()
-                )
+                );
             }
             _ => {
-                println!("Unknown packet identifier")
+                println!("Unknown packet identifier");
             }
         }
-    }).join();
+    })
+    .join();
 }

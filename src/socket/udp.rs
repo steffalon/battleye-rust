@@ -1,6 +1,6 @@
-use std::io::{Error};
-use std::net::{Ipv4Addr, UdpSocket};
 use crate::socket::action::SocketAction;
+use std::io::Error;
+use std::net::{Ipv4Addr, UdpSocket};
 
 pub struct UdpSocketConnection {
     udp_socket: UdpSocket,
@@ -25,8 +25,6 @@ impl SocketAction for UdpSocketConnection {
 
 impl UdpSocketConnection {
     pub fn new(udp_socket: UdpSocket) -> Self {
-        Self {
-            udp_socket
-        }
+        Self { udp_socket }
     }
 }

@@ -1,1 +1,1 @@
-pub mod crc32;
+pub(crate) mod checksum;
