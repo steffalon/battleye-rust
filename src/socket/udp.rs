@@ -19,7 +19,7 @@ impl SocketAction for UdpSocketConnection {
     }
 
     fn send(&self, data: &[u8]) -> std::io::Result<usize> {
-        self.udp_socket.send(&data)
+        self.udp_socket.send(data)
     }
 }
 
