@@ -66,11 +66,11 @@ impl BERemoteConsole {
         let mut assemble_packets: Vec<u8> = vec![0xFF, message_type_packet];
         assemble_packets.extend(msg);
 
-        let crc32check = msg_to_checksum_le_vec(&assemble_packets); // Apply CRC-32 on message
+        let mut crc32check = msg_to_checksum_le_vec(&assemble_packets); // Apply CRC-32 on message
 
         let mut data = packet_types::STATIC_HEADER.to_vec(); // Start header BE
-        data.extend(crc32check); // CRC 32 hash
-        data.extend(assemble_packets); // Regular packet array without CRC 32
+        data.append(&mut crc32check); // CRC 32 hash
+        data.append(&mut assemble_packets); // Regular packet array without CRC 32
 
         self.get_udp_socket().send(&data)
     }
