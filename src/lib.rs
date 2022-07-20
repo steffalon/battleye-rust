@@ -1,2 +1,2 @@
-pub mod socket;
 pub mod remote_console;
+pub mod socket;
