@@ -36,7 +36,7 @@ fn main() {
         stdin()
             .read_line(&mut input_string)
             .expect("Did not enter a correct string");
-        socket_commands.send_command(input_string.as_str().trim());
+        socket_commands.send_command(input_string.trim());
     });
 
     thread::spawn(move || loop {
