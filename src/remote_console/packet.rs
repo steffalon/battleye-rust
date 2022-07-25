@@ -1,5 +1,4 @@
 pub mod packet_types {
-    // Is this enough?
     pub const STATIC_HEADER: [u8; 2] = [0x42, 0x45]; // Required identifier ['B','E']
 
     pub const MESSAGE_TYPE_PACKET_LOGIN: u8 = 0x00;
