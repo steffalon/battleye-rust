@@ -23,7 +23,7 @@ implement/use this library.
 - [x] Keep alive connection method included
 - [x] Non-blocking read & write to socket (See examples)
 - [x] Error handling
-- [ ] Build self-testing
+- [x] Build self-testing
 
 ## Cargo dependencies
 
