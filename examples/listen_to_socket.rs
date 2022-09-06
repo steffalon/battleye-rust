@@ -29,7 +29,6 @@ fn main() {
     });
 
     thread::spawn(move || loop {
-        sleep(Duration::from_millis(50)); // Reduce CPU workload
         let response = be_remote_console
             .receive_data()
             .expect("Failed to receive socket data");
